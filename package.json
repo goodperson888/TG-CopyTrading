@@ -1,6 +1,6 @@
 {
   "name": "tg-copy-desk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "本机 Telegram 公开消息监听、纸上交易与 OKX 独立钱包跟单",

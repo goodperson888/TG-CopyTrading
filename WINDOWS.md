@@ -4,10 +4,12 @@
 
 ## 下载和使用
 
-在 GitHub 仓库的 **Actions → Windows portable build** 中打开成功的运行，下载 `TGCopyTrading-Windows-x64` artifact。先解压下载文件，再解压其中的 `TGCopyTrading-Windows-x64.zip`。整个 `TGCopyTrading` 文件夹一起保留，可放在 `C:\TGCopyTrading`；不要在压缩包预览中直接运行。
+**[下载 Windows x64 ZIP](https://github.com/goodperson888/TG-CopyTrading/releases/latest/download/TGCopyTrading-Windows-x64.zip)** · [版本页面 / SHA-256 校验](https://github.com/goodperson888/TG-CopyTrading/releases/latest)
 
-1. 通用包首次使用双击 `配置.cmd`，自动用记事本打开本机 `.env`；在等号后填写自己的 API Key、Secret 和 Passphrase，有 Project ID 再填。保存后关闭记事本。无需把隐藏文件重命名，不要另存为 `.env.txt`。
-2. 双击 `启动.cmd`，浏览器自动打开本机控制台。终端窗口需保持运行。填好策略后点击启动，报价检查自动完成。首次默认为纸上模式，新买入暂停。
+公开下载，无需登录 GitHub。下载 ZIP 后解压一次，整个 `TGCopyTrading` 文件夹一起保留，可放在 `C:\TGCopyTrading`；不要在压缩包预览中直接运行。
+
+1. 双击 `启动.cmd`，浏览器自动打开本机控制台，终端窗口需保持运行。首次默认为纸上模式，新买入暂停。
+2. 打开网页 **策略与连接 → 本机 API 配置**，填入自己的 API Key、Secret、Passphrase，有 Project ID 再填。点击“保存到本机”后立即生效，再点“测试 API 连接”检查 SOL / BSC 只读报价。留空保留原值，保存后输入框清空、不回显密钥。填好资金和止盈止损等规则后点“启动纸上跟单”。
 3. 实盘另需在 Windows 本机连接独立跟单钱包，并在官方页面设置自动交易及限额。已有浏览器插件钱包连接不会代替这项授权。SOL 使用 USDC 和 SOL 网络费，BSC 使用 USDT 和 BNB 网络费。
 4. 停止新买入用网页按钮；完全停止用 `停止.cmd`，或者在启动窗口按 Ctrl+C。完全停止不会自动卖出，止盈止损也停止。关闭网页不会关闭后台。
 
@@ -22,7 +24,9 @@ OUTBOUND_PROXY=
 PORT=8765
 ```
 
-`配置.cmd` 编辑的是当前文件夹的配置；修改后先停止、再启动。源码和 GitHub 通用包只包含空白 `.env.example`，不会带开发者的 Key。
+网页配置仅处理上方四项 OKX API 凭证，并保留代理、端口、RPC 等其他配置值。网络等高级字段可用 `配置.cmd` 在记事本中编辑当前文件夹的 `.env`；手动修改后先停止、再启动，不要另存为 `.env.txt`。源码和 GitHub 通用包只包含空白 `.env.example`，不会带开发者的 Key。
+
+每位用户申请自己的开发者 API 凭证；API Key、Secret 和 Passphrase 不可随公开客户端共用。共享密钥会暴露给客户端用户并共用配额及账户权限。钱包登录也由各用户自行完成，程序不索要私钥或助记词。配置和数据只存本机，分发给别人时请发送 Releases 通用 ZIP。
 
 ## 仅本机配置版
 
@@ -40,6 +44,6 @@ PORT=8765
 
 ## 自动构建
 
-推送 `main`、推送 `v*` 标签或在 Actions 手动运行，会在 Windows runner 上执行依赖安装、自动测试、语法检查、固定版本与 SHA-256 校验、打包、解压和实际启动/正常停止验收，再上传 zip 和校验文件。不会自动登录钱包或测试真实交易。
+推送 `main`、推送 `v*` 标签或在 Actions 手动运行，会在 Windows runner 上执行依赖安装、自动测试、语法检查、固定版本与 SHA-256 校验、打包、解压和实际启动/正常停止验收，再上传 zip 和校验文件。`v*` 标签在所有检查通过后自动创建公开 GitHub Release，提供固定文件名下载；普通分支构建仍只保存 Actions artifact。不会自动登录钱包或测试真实交易。
 
 本地构建：`npm ci --ignore-scripts` 后运行 `npm run build:win`；Windows 可继续 `npm run verify:win`。macOS 能生成 Windows 包，但不能替代 Windows 实机运行验证。运行时和钱包组件版本/校验值固定在 `scripts/windows-runtime.json` 与 `scripts/wallet-release.json`。

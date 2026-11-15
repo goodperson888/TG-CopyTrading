@@ -43,3 +43,40 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      BUILD_RUN: ${{ github.run_id }}
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Download tested public package
+        run: gh run download "$BUILD_RUN" --name TGCopyTrading-Windows-x64 --dir dist
+      - name: Publish public Windows download
+        working-directory: dist
+        run: |
+          sha256sum -c TGCopyTrading-Windows-x64.zip.sha256
+          cat > release-notes.md <<'NOTES'
+          Windows 10 / 11 x64 便携版。下载 TGCopyTrading-Windows-x64.zip，解压后双击 启动.cmd，无需另外安装 Node.js。
+
+          网页「策略与连接 → 本机 API 配置」填写自己的 OKX API Key、Secret、Passphrase 和可选 Project ID，保存后立即生效，再测试连接。每位用户使用自己的凭证；公开包不含开发者 Key、钱包会话和交易数据。
+
+          默认纸上模式，新买入暂停。填好策略后手动启动跟单；实盘另需连接自己的独立跟单钱包并设置自动交易限额。实盘尚未完成真实账户成交验收。
+
+          完全停止用 停止.cmd；停止后不再检查止盈止损，也不会自动清仓。关闭网页不停止后台。请保持电脑唤醒和联网。
+
+          包内 Node.js、OKX 组件均经过固定 SHA-256 校验；已通过 Windows 自动测试、打包解压、实际启动和正常停止检查。zip.sha256 可用于校验下载文件。
+          NOTES
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" TGCopyTrading-Windows-x64.zip TGCopyTrading-Windows-x64.zip.sha256 --clobber
+          else
+            gh release create "$RELEASE_TAG" TGCopyTrading-Windows-x64.zip TGCopyTrading-Windows-x64.zip.sha256 --verify-tag --latest --title "TG 群跟单 $RELEASE_TAG · Windows 便携版" --notes-file release-notes.md
+          fi

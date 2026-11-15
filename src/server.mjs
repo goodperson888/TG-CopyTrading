@@ -8,9 +8,10 @@ import { lockDataDir } from './lock.mjs';
 import { Store } from './store.mjs';
 import { Engine } from './engine.mjs';
 import { network } from './network.mjs';
-import { OkxQuotes } from './okx.mjs';
+import { LocalCredentials, CREDENTIAL_FIELDS } from './credentials.mjs';
+import { QuoteRouter } from './quotes.mjs';
 import { AgentWallet } from './wallet.mjs';
-import { CliQuotes, LiveExecutor } from './live.mjs';
+import { LiveExecutor } from './live.mjs';
 import { CHAINS, validAddress, units, validateSettings } from './domain.mjs';
 import { APPLICATION, installationId } from './installation.mjs';
 
@@ -18,10 +19,11 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 process.umask(0o077);
 if (existsSync(join(ROOT, '.env'))) process.loadEnvFile(join(ROOT, '.env'));
 
-export function createApp({ dataDir = process.env.TG_COPY_DATA_DIR || join(ROOT, 'data'), net: injectedNet, quotes: injectedQuotes, wallet: injectedWallet, live: injectedLive, fixtures: injectedFixtures, runWorker = true } = {}) {
+export function createApp({ dataDir = process.env.TG_COPY_DATA_DIR || join(ROOT, 'data'), configRoot = ROOT, credentialEnv = process.env, net: injectedNet, quotes: injectedQuotes, wallet: injectedWallet, live: injectedLive, fixtures: injectedFixtures, runWorker = true } = {}) {
+  const credentials = new LocalCredentials(configRoot, credentialEnv);
   let initialSettings = {};
-  if (existsSync(join(ROOT, 'settings.local.json'))) {
-    try { initialSettings = validateSettings({ ...JSON.parse(readFileSync(join(ROOT, 'settings.local.json'), 'utf8')), mode: 'paper' }); }
+  if (existsSync(join(configRoot, 'settings.local.json'))) {
+    try { initialSettings = validateSettings({ ...JSON.parse(readFileSync(join(configRoot, 'settings.local.json'), 'utf8')), mode: 'paper' }); }
     catch { throw new Error('本机策略快照格式无效，请检查 settings.local.json'); }
   }
   mkdirSync(dataDir, { recursive: true, mode: 0o700 });
@@ -29,8 +31,8 @@ export function createApp({ dataDir = process.env.TG_COPY_DATA_DIR || join(ROOT,
   const store = new Store(join(dataDir, 'desk.sqlite'));
   const net = injectedNet || network();
   const wallet = injectedWallet || new AgentWallet({ root: ROOT, dataDir, proxy: net.proxyUrl });
-  const apiQuotes = new OkxQuotes(net);
-  const quotes = injectedQuotes || (apiQuotes.configured ? apiQuotes : new CliQuotes(wallet));
+  const quotes = new QuoteRouter(net, wallet, credentials.values, injectedQuotes);
+  if (wallet.env) for (const key of CREDENTIAL_FIELDS) wallet.env[key] = credentials.values[key];
   const live = injectedLive || new LiveExecutor(wallet, quotes, net);
   const fixturePath = join(ROOT, 'fixtures', 'messages.json');
   const fixtures = injectedFixtures || (existsSync(fixturePath) ? JSON.parse(readFileSync(fixturePath, 'utf8')) : []);
@@ -52,7 +54,7 @@ export function createApp({ dataDir = process.env.TG_COPY_DATA_DIR || join(ROOT,
       // Fixed loopback host validation prevents DNS rebinding. No remote UI or CORS.
       if (!/^127\.0\.0\.1:\d+$/.test(host || '') && !/^localhost:\d+$/.test(host || '')) return reply(403, { error: '仅允许本机访问' });
       const url = new URL(request.url, `http://${host}`);
-      if (request.method === 'GET' && url.pathname === '/api/state') return reply(200, { ...engine.state(), csrf: token, application: APPLICATION, installationId: installationId(ROOT) });
+      if (request.method === 'GET' && url.pathname === '/api/state') return reply(200, { ...engine.state(), credentials: credentials.status(), csrf: token, application: APPLICATION, installationId: installationId(configRoot) });
       if (request.method === 'GET' && url.pathname === '/api/export') {
         response.writeHead(200, { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': 'attachment; filename="tg-copy-records.json"' });
         const state = engine.state();
@@ -81,7 +83,7 @@ export function createApp({ dataDir = process.env.TG_COPY_DATA_DIR || join(ROOT,
       try { input = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); }
       catch { return reply(400, { error: 'JSON 格式无效' }); }
       // Pausing takes effect before a queued quote resolves.
-      if (['/api/pause', '/api/monitor/stop', '/api/settings', '/api/wallet/login', '/api/wallet/login-result', '/api/shutdown'].includes(url.pathname)) engine.pauseEntries();
+      if (['/api/pause', '/api/monitor/stop', '/api/settings', '/api/credentials', '/api/wallet/login', '/api/wallet/login-result', '/api/shutdown'].includes(url.pathname)) engine.pauseEntries();
       if (url.pathname === '/api/shutdown') {
         response.once('finish', () => setImmediate(() => server.emit('shutdown-request')));
         return reply(200, { ok: true, message: '正在正常停止；不会自动清仓。' });
@@ -92,6 +94,14 @@ export function createApp({ dataDir = process.env.TG_COPY_DATA_DIR || join(ROOT,
       if (url.pathname === '/api/wallet/refresh') return reply(200, { ok: true, wallet: await wallet.refresh() });
       const result = await engine.exclusive(async () => {
         switch (url.pathname) {
+          case '/api/credentials': {
+            const status = credentials.save(input);
+            quotes.apply(credentials.values);
+            if (wallet.env) for (const key of CREDENTIAL_FIELDS) wallet.env[key] = credentials.values[key];
+            engine.store.log('info', '本机 API 配置已更新，新买入暂停；请测试连接后重新启动跟单。', engine.config.mode);
+            return { credentials: status };
+          }
+          case '/api/credentials/test': return quotes.testCredentials();
           case '/api/settings': return engine.saveSettings(input);
           case '/api/monitor/start': if (!engine.monitoring) await engine.startMonitor(); return {};
           case '/api/monitor/stop': engine.monitoring = false; engine.store.log('info', '频道监听已停止；已有持仓继续检查退出。', engine.config.mode); return {};

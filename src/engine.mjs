@@ -39,7 +39,7 @@ export class Engine {
   assertEntryPrerequisites(requireVerified = true) {
     if (!this.monitoring || this.needsBaseline || this.lastError || !this.lastSuccess || Date.now() - Date.parse(this.lastSuccess) > this.config.maxSignalAgeSec * 1000) throw new Error('请先建立健康的频道监听基线');
     this.assertReady();
-    if (!this.quotes.configured) throw new Error('报价连接不可用，请在高级诊断检查本机 API 配置或钱包登录权限');
+    if (!this.quotes.configured) throw new Error('报价连接不可用，请在“策略与连接”填写本机 API 配置，或检查钱包登录权限');
     if (requireVerified && !this.quotes.verified) throw new Error('报价尚未验证，请重新点击启动以自动检查连接');
     if (this.config.mode === 'live') {
       if (!this.live) throw new Error('实盘执行器未配置');
@@ -455,7 +455,7 @@ export class Engine {
       summary: { messages: scope ? this.store.count('signals', scope) : 0, open: open.length,
         blocked: open.filter(p => p.status === 'exit_blocked' || p.status === 'quote_unavailable').length,
         ...totals, budgetLeft: this.config.totalBudget === null ? null : Math.max(0, this.config.totalBudget - totals.invested - (scope === 'live' ? this.store.liveReserved() : 0)) },
-      serverTime: new Date().toISOString(), version: '0.2.0',
+      serverTime: new Date().toISOString(), version: '0.3.0',
     };
   }
 }

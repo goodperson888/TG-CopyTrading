@@ -92,6 +92,13 @@ function render() {
   $('#pending-orders').innerHTML = state.pendingOrders.length ? `<div class="notice error"><strong>实盘有 ${state.pendingOrders.length} 笔订单需要核对，禁止重复下单</strong></div>` + state.pendingOrders.map(o => `<div class="pending-order"><strong>${escape(o.name)} · ${escape(o.chain)} · ${o.side === 'buy' ? '买入' : '卖出'}</strong><p>${escape(o.issue || '等待链上最终确认')}</p><p>${escape(o.txHash || '尚无哈希，请查看官方钱包交易记录')}</p>${!o.txHash ? `<label class="field"><span>原订单已确认的交易哈希</span><input id="hash-${escape(o.id)}" autocomplete="off" placeholder="关联原订单，不会提交新交易"></label><button class="button small" data-bind-order="${escape(o.id)}">核对并关联哈希</button>` : ''}</div>`).join('') : '';
   $('#okx-badge').textContent = state.connections.okxConfigured ? '报价连接 · ' + state.connections.okxStatus : '报价权限待连接';
   $('#okx-badge').className = 'badge ' + (state.connections.okxConfigured ? 'blue' : 'neutral');
+  const credentials = state.credentials;
+  $('#credentials-badge').textContent = credentials.configured ? '已保存 · 可测试连接' : '待填写个人凭证';
+  $('#credentials-badge').className = 'badge ' + (credentials.configured ? 'blue' : 'neutral');
+  for (const [key, saved] of Object.entries(credentials.fields)) {
+    $('#status-' + key).textContent = saved ? '已设置' : '未设置';
+    $('#credentials-form').elements.namedItem(key).placeholder = saved ? '已设置，留空保留原值' : key === 'OKX_PROJECT_ID' ? '如有则填写' : '填写你自己的凭证';
+  }
 }
 function renderMode() {
   const c = state.config, live = c.mode === 'live', w = state.connections.wallet;
@@ -168,6 +175,30 @@ document.addEventListener('click', async event => {
 });
 $('#signal-filter').addEventListener('change', render);
 $('#close-dialog').addEventListener('click', () => $('#message-dialog').close());
+$('#credentials-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.currentTarget, buttons = form.querySelectorAll('button');
+  buttons.forEach(button => { button.disabled = true; });
+  pending++;
+  try {
+    await post('/api/credentials', Object.fromEntries(new FormData(form)));
+    form.reset();
+    $('#credentials-status').textContent = '已保存到本机并立即生效。新买入已暂停，请测试连接后重新启动跟单。';
+    toast('API 配置已保存到本机');
+  } catch (error) { $('#credentials-status').textContent = error.message; toast(error.message, true); }
+  finally { pending--; buttons.forEach(button => { button.disabled = false; }); await refresh(); }
+});
+$('#test-credentials').addEventListener('click', async event => {
+  const form = $('#credentials-form'), button = event.currentTarget;
+  if ([...form.querySelectorAll('input')].some(input => input.value.trim())) {
+    $('#credentials-status').textContent = '有未保存的 API 配置，请先点击“保存到本机”再测试。'; return;
+  }
+  button.disabled = true; pending++;
+  $('#credentials-status').textContent = '正在测试已保存的 API 凭证：SOL / BSC 只读报价，不会下单…';
+  try { const result = await post('/api/credentials/test'); $('#credentials-status').textContent = result.message; }
+  catch (error) { $('#credentials-status').textContent = error.message; toast(error.message, true); }
+  finally { pending--; button.disabled = false; await refresh(); }
+});
 $('#settings-form').addEventListener('input', () => { $('#form-status').textContent = '有未保存的修改'; $('#form-status').className = 'dirty'; });
 $('#settings-form').addEventListener('submit', async event => {
   event.preventDefault();

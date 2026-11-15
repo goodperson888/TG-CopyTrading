@@ -1,12 +1,14 @@
 # TG 群跟单 · 本机控制台
 
-2026-11-15，当前版本 **0.2.0**。形式为本机后台程序＋浏览器控制台，两个交易模式共用策略，账本分别保存。
+2026-11-15，当前版本 **0.3.0**。形式为本机后台程序＋浏览器控制台，两个交易模式共用策略，账本分别保存。
 
 **当前状态：自动监听、纸上交易、离线演练可用；实盘接入代码和异常流程已实现，尚未使用本人的已登录钱包完成端到端验收。** 2026-11-15，本机已加载本人开发者 API 凭证，SOL 和 BSC 真实只读报价均通过；没有登录跟单钱包或执行真实交易。策略参数仍待补齐，新买入保持暂停。只读报价和模拟接口测试不能代替真实账户的交易权限、费用、签名和成交回执验收。
 
 ## Windows 下载与打包
 
-GitHub **Actions → Windows portable build** 自动生成 Windows 10 / 11 x64 便携包，内置 Node.js 和 OKX 钱包组件。解压后双击 `配置.cmd` 填写本机 `.env`，保存后运行 `启动.cmd`；`停止.cmd` 正常停止后台。详见 [Windows 使用说明](WINDOWS.md)。通用包及仓库均不含个人 Key、钱包会话、策略快照或交易数据库。
+**[⬇ 下载 Windows x64 便携包](https://github.com/goodperson888/TG-CopyTrading/releases/latest/download/TGCopyTrading-Windows-x64.zip)** · [所有版本及校验文件](https://github.com/goodperson888/TG-CopyTrading/releases/latest)
+
+下载入口公开，无需登录 GitHub。适用于 Windows 10 / 11 x64，内置 Node.js 和 OKX 钱包组件。解压后运行 `启动.cmd`，在网页 **策略与连接 → 本机 API 配置** 填写自己的凭证，点击“保存到本机”后直接生效；`停止.cmd` 正常停止后台。详见 [Windows 使用说明](WINDOWS.md)。通用包及仓库均不含个人 Key、钱包会话、策略快照或交易数据库。
 
 开发机可用 `npm run build:win` 构建通用包；本人需要预填配置时可用 `npm run build:win:private`，结果只保存在被 Git 忽略的 `private-builds`，包含本人 `.env` 及策略设置，**不可公开上传或转发**。配置版不迁移钱包会话、订单或持仓，Windows 首次默认纸上暂停。GitHub Actions 禁止生成带本机凭证的包。
 
@@ -42,7 +44,9 @@ npm start
 
 ## 首次接入
 
-纸上交易：本机已配置 `.env`；新安装时若不存在，可复制 `.env.example` 为 `.env`。在本机填写本人 OKX 开发者 `OKX_API_KEY`、`OKX_API_SECRET`、`OKX_API_PASSPHRASE`，按账户要求填写 `OKX_PROJECT_ID`，设文件权限为 0600，再重启。填写策略后直接点“启动纸上跟单”，程序自动验证 SOL / BSC 报价，不需要手动输入测试地址。API 凭证不发到浏览器，不需要连接钱包。“高级诊断”默认折叠，仅排查连接时使用。
+纸上交易：在网页“策略与连接 → 本机 API 配置”填写自己的 OKX 开发者 `OKX_API_KEY`、`OKX_API_SECRET`、`OKX_API_PASSPHRASE`，按账户要求填写 `OKX_PROJECT_ID`。保存到本机 `.env` 后立即生效，可先点击“测试 API 连接”执行固定金额的只读报价，无需填写交易策略或合约地址。输入留空会保留已保存值，保存后页面清空输入框，仅显示设置状态。更换凭证暂停新买入，已有持仓继续退出检查。填写策略后点“启动纸上跟单”，程序再自动验证 SOL / BSC 报价。无需连接钱包；已保存密钥不会在状态接口、导出或页面回显。手动编辑 `.env` 则需重启。
+
+**分发时每位用户使用自己的 API 凭证和钱包。** 不要把开发者的 Key、Secret 或 Passphrase 打进通用客户端；客户端里的共享 Key 可被提取，并会共用额度、白名单及权限。如要统一提供 API 服务，需另行设计服务端保管凭证、用户鉴权和配额管理，当前版本不提供此模式。API 权限、额度和费用以各用户官方账户为准。
 
 实盘：官方工具 **OnchainOS 4.6.10** 已安装在项目 `.tools/onchainos`，按官方 checksums 校验了 SHA-256。需要重新安装时双击 `安装钱包组件.command`。安装器固定版本和哈希，不安装全局 CLI、其他技能或系统服务。
 
