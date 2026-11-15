@@ -1,0 +1,23 @@
+{
+  "name": "tg-copy-desk",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "本机 Telegram 公开消息监听、纸上交易与 OKX 独立钱包跟单",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node scripts/check-syntax.mjs",
+    "install:wallet": "node scripts/install-wallet.mjs",
+    "build:win": "node scripts/build-windows.mjs",
+    "build:win:private": "node scripts/build-windows.mjs --with-local-env",
+    "verify:win": "node scripts/verify-windows.mjs"
+  },
+  "dependencies": {
+    "linkedom": "^0.18.12",
+    "undici": "^7.16.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "version": "4.6.10",
+  "assets": {
+    "onchainos-aarch64-apple-darwin": "3e003b9389e97a250069d6402f2845083a981592b4e8b920266703a72cefec4e",
+    "onchainos-x86_64-apple-darwin": "eaf756bdcf89825d355b4056e09e431c8fcc25f288444ed96a55850acea971f1",
+    "onchainos-x86_64-pc-windows-msvc.exe": "3172fe8d64629552d79cb3840d1dff51d0faba5585eca990776b2793d9acaf92",
+    "onchainos-aarch64-pc-windows-msvc.exe": "e5a529150b61a3bb5443ac3da8ee186ab5bb8e2063101e9fa1a3320f89bb4351"
+  }
+}

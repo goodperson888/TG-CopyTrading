@@ -1,0 +1,15 @@
+import { readFileSync, mkdirSync, chmodSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+import { downloadVerified } from './download.mjs';
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const release = JSON.parse(readFileSync(join(root, 'scripts/wallet-release.json')));
+if (!['darwin', 'win32'].includes(process.platform) || !['arm64', 'x64'].includes(process.arch)) throw new Error('安装器支持 macOS / Windows 的 x64、arm64；其他平台可配置 ONCHAINOS_BIN');
+const arch = process.arch === 'arm64' ? 'aarch64' : 'x86_64';
+const name = `onchainos-${arch}-${process.platform === 'win32' ? 'pc-windows-msvc.exe' : 'apple-darwin'}`;
+const dir = join(root, '.tools'); mkdirSync(dir, { recursive: true, mode: 0o700 });
+const target = join(dir, process.platform === 'win32' ? 'onchainos.exe' : 'onchainos');
+console.log(`下载并校验 OKX 官方 CLI ${release.version}，仅安装到此项目。`);
+await downloadVerified(`https://github.com/okx/onchainos-skills/releases/download/v${release.version}/${name}`, target, release.assets[name]);
+chmodSync(target, 0o700);
+console.log('校验通过，安装完成。返回控制台连接钱包。');

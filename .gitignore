@@ -1,0 +1,17 @@
+node_modules/
+.env
+.env.*
+!.env.example
+data/
+artifacts/
+.playwright-cli/
+.DS_Store
+*.log
+.tools/
+.build/
+.build-cache/
+dist/
+private-builds/
+settings.local.json
+*.zip
+*.sqlite*

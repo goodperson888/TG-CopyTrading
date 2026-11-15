@@ -1,0 +1,8 @@
+import { createHash } from 'node:crypto';
+import { realpathSync } from 'node:fs';
+
+export const APPLICATION = 'tg-copy-desk';
+export function installationId(root) {
+  const path = realpathSync(root);
+  return createHash('sha256').update(process.platform === 'win32' ? path.toLowerCase() : path).digest('hex');
+}

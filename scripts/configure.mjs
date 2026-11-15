@@ -1,0 +1,12 @@
+import { copyFileSync, chmodSync, existsSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const target = join(root, '.env');
+if (!existsSync(target)) copyFileSync(join(root, '.env.example'), target);
+chmodSync(target, 0o600);
+console.log('正在打开本机 .env。填写后保存、关闭编辑器，再重新启动程序。不要上传或分享此文件。');
+if (process.platform === 'win32') execFile('notepad.exe', [target], { windowsHide: false }, error => { if (error) console.error('编辑器未打开，请在程序目录手动编辑 .env。'); });
+else if (process.platform === 'darwin') execFile('/usr/bin/open', ['-t', target], () => {});
+else console.log('请使用纯文本编辑器打开程序目录的 .env。');

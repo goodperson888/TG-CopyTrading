@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TG 群跟单 · 本机控制台</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script></head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="TG 群跟单首页"><img src="/favicon.svg" alt="" width="38" height="38"><span>TG 跟单<span class="brand-sub">COPY DESK / LOCAL</span></span></a>
+    <div class="nav-label">工作空间</div>
+    <nav aria-label="主导航">
+      <button class="nav active" data-page="overview"><svg viewBox="0 0 24 24"><path d="M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h7v7h-7z"/></svg>运行概览</button>
+      <button class="nav" data-page="signals"><svg viewBox="0 0 24 24"><path d="m3 12 5-7 5 14 4-9h4"/></svg>频道信号<span id="nav-signal-count" class="nav-count">0</span></button>
+      <button class="nav" data-page="positions"><svg viewBox="0 0 24 24"><path d="M4 20V10m8 10V4m8 16v-7"/></svg>策略持仓</button>
+      <button class="nav" data-page="logs"><svg viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 8h6m-6 4h6m-6 4h3"/></svg>操作记录</button>
+      <button class="nav" data-page="settings"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 17h16M8 4v6m8 4v6"/></svg>策略与连接</button>
+    </nav>
+    <div class="sidebar-bottom"><span class="dot"></span> 仅本机访问<span class="mono">v0.2.0</span><p>数据保存在此电脑<br>电脑需保持唤醒和联网<br>关闭程序会停止退出检查</p></div>
+  </aside>
+  <main>
+    <header class="topbar"><div class="breadcrumb">工作空间 <span>/</span> <strong id="page-name">运行概览</strong></div><div class="top-status"><span class="tag" id="active-mode">纸上交易 · 新买入暂停</span><span id="clock" class="mono"></span></div></header>
+    <div class="content">
+      <div id="connection-lost" class="notice error" hidden>本机服务连接中断。正在重连；请确认程序仍在运行。</div>
+      <div id="demo-notice" class="notice demo" hidden><div><strong>正在查看离线演练</strong><span>历史消息＋合成报价，与真实监听数据分开保存；结果不代表历史收益。</span></div><button class="button small" data-action="leave-demo">返回真实监听</button></div>
+      <div id="paper-notice" class="notice"><span class="notice-line"></span><div><strong id="mode-title">纸上交易</strong><span id="mode-description">使用真实群消息与报价，纸上成交无需连接钱包。启动后自动监听，开始交易需点启动跟单。</span></div></div>
+
+      <section id="page-overview" class="page">
+        <div class="page-heading"><div><div class="eyebrow">TG COPY DESK</div><h1>让每一笔信号，有迹可循<span class="heading-dot">.</span></h1><p>只跟新币首推，用自己的规则管理退出。</p></div><button class="button primary" data-action="start" id="start-monitor">开启频道监听 <span>↗</span></button></div>
+        <div class="panel mode-controls"><label class="field"><span>交易模式</span><select id="mode-select"><option value="paper">纸上交易 · 无需钱包</option><option value="live">实盘交易 · 独立跟单钱包</option></select></label><div><strong id="trade-status">新买入暂停</strong><p class="helper" id="readiness-note">正在检查连接</p></div><div class="button-row"><button class="button primary" data-action="enable" id="enable-entries">启动跟单</button><button class="button danger-quiet" data-action="pause" id="pause-entries" hidden>暂停新买入</button></div></div>
+        <div class="metrics">
+          <article class="metric"><div class="metric-label">已归档消息 <span>01</span></div><div class="metric-value" id="metric-messages">0</div><div class="metric-foot">首推 · 跟踪 · 日报均留档</div></article>
+          <article class="metric"><div class="metric-label">策略持仓 <span>02</span></div><div class="metric-value"><span id="metric-open">0</span><small>个</small></div><div class="metric-foot" id="metric-blocked">等待新信号</div></article>
+          <article class="metric"><div class="metric-label">累计投入 <span>03</span></div><div class="metric-value"><span id="metric-invested">0.00</span><small>U</small></div><div class="metric-foot" id="metric-budget">预算待设置</div></article>
+          <article class="metric"><div class="metric-label">已实现损益 <span>04</span></div><div class="metric-value" id="metric-pnl">0.00<small>U</small></div><div class="metric-foot">按当前账本记录成交与费用</div></article>
+        </div>
+        <div class="overview-grid">
+          <article class="panel channel-panel"><div class="panel-head"><h2>信号源</h2><span id="channel-badge" class="badge neutral">待连接</span></div><div class="channel-identity"><div class="channel-avatar">蜗</div><div><h3>蜗牛Meme雷达</h3><a href="https://t.me/s/WoniuTuGou" target="_blank" rel="noreferrer">@WoniuTuGou ↗</a></div></div><dl class="facts"><div><dt>获取方式</dt><dd>公开预览 · 无需账号登录</dd></div><div><dt>本次连接</dt><dd id="channel-proxy">检测中</dd></div><div><dt>最后同步</dt><dd id="channel-last">尚未同步</dd></div><div><dt>最新消息 ID</dt><dd class="mono" id="channel-id">—</dd></div></dl><div id="channel-error" class="inline-error" hidden></div><p class="helper">启动和重连时先归档现有消息。公开预览可能存在延迟、缓存或窗口缺口。</p><div class="button-row"><button class="button" data-action="stop" id="stop-monitor" disabled>停止监听</button><button class="button quiet" data-go="signals">查看信号 →</button></div></article>
+          <article class="panel strategy-panel"><div class="panel-head"><h2>策略快照</h2><button class="text-button" data-go="settings">编辑规则 ↗</button></div><div class="rules-grid"><div><span>单笔金额</span><strong id="rule-amount">待设置</strong></div><div><span>最大持仓</span><strong id="rule-positions">待设置</strong></div><div><span>止盈 / 全卖</span><strong class="positive" id="rule-profit">待设置</strong></div><div><span>止损 / 全卖</span><strong class="negative" id="rule-loss">待设置</strong></div></div><div class="pipeline"><span>首推识别</span><i>→</i><span>地址校验</span><i>→</i><span>限额检查</span><i>→</i><span>按模式成交</span></div><div class="policy-note"><span class="dot"></span><p id="strategy-note">填写预算、退出阈值与成本上限后，即可进行离线演练。</p></div><div class="button-row"><button class="button primary" data-action="demo">运行离线演练</button></div></article>
+        </div>
+        <article class="panel recent-panel"><div class="panel-head"><h2>最近信号 <span class="subtle">RECENT SIGNALS</span></h2><button class="text-button" data-go="signals">全部记录 →</button></div><div id="recent-signals"></div></article>
+      </section>
+
+      <section id="page-signals" class="page" hidden><div class="page-heading compact"><div><div class="eyebrow">SIGNAL ARCHIVE</div><h1>频道信号</h1><p>按公链和完整地址识别资产，跟踪、日报与历史消息只归档。</p></div><label class="filter-label">消息类型<select id="signal-filter"><option value="all">全部消息</option><option value="first">新币首推</option><option value="followup">强势跟踪</option><option value="report">日报</option></select></label></div><article class="panel"><div id="all-signals"></div></article></section>
+      <section id="page-positions" class="page" hidden><div class="page-heading compact"><div><div class="eyebrow">STRATEGY POSITIONS</div><h1>策略持仓</h1><p>纸上与实盘共用止盈止损规则；实盘阈值以链上实际支出和到账数量计算的均价为准。</p></div></div><div class="notice"><div><strong>此处不是钱包余额</strong><span>纸上采用报价扣减滑点后的数量。实盘只卖本策略实际到账数量，待确认订单不会当作成交；已有仓位使用建仓时的规则。</span></div></div><div id="positions-list"></div></section>
+      <section id="page-logs" class="page" hidden><div class="page-heading compact"><div><div class="eyebrow">ACTIVITY & AUDIT</div><h1>操作记录</h1><p>纸上和实盘账本独立。记录跳过、交易受阻、待确认和实际成交。</p></div><a class="button" href="/api/export" download>导出当前记录 ↗</a></div><article class="panel"><div class="panel-head"><h2>运行日志 <span class="subtle">最近 100 条</span></h2></div><div id="logs-list"></div></article><article class="panel order-panel"><div class="panel-head"><h2>订单与成交记录</h2></div><div id="orders-list"></div><div id="pending-orders"></div></article></section>
+
+      <section id="page-settings" class="page" hidden><div class="page-heading compact"><div><div class="eyebrow">STRATEGY & CONNECTIONS</div><h1>把边界设在交易之前</h1><p>资金和涨跌参数由你填写，程序不预设交易金额。</p></div></div>
+        <form id="settings-form" novalidate>
+          <article class="panel"><div class="panel-head"><h2>运行方式</h2><span class="badge neutral">本机后台运行</span></div><label class="field full"><span>信号处理方式</span><select name="mode"><option value="paper">纸上交易 · 无需钱包，需行情或报价权限</option><option value="live">实盘交易 · 独立跟单钱包自动签名</option></select><small>两个模式共用全部策略参数，账本独立。保存设置或切换模式会暂停新买入。离线演练仅为测试工具。</small></label></article>
+          <article class="panel"><div class="panel-head"><h2>资金与退出</h2><span class="subtle">所有金额参数待填写</span></div><div class="form-grid" id="money-fields"></div><p class="helper">U 为计价稳定币单位：SOL 用 USDC，BSC 用 USDT，不等同于美元现金。累计投入包含预估网络费，卖出后不自动释放额度。</p></article>
+          <article class="panel"><div class="panel-head"><h2>入场与成本边界</h2></div><div class="form-grid" id="limit-fields"></div><p class="helper">追价对比频道首推参考价。超限跳过；卖出超限时保留持仓并告警，不放宽限制。网络费是报价估算，不代表全部链上交易成本。</p></article>
+          <article class="panel"><div class="panel-head"><h2>采集与重试</h2></div><div class="form-grid" id="timing-fields"></div></article>
+          <div class="form-footer"><p id="form-status" role="status">参数只保存在这台电脑。</p><button class="button primary" type="submit">保存策略设置</button></div>
+        </form>
+        <article id="wallet-panel" class="panel connection-panel" hidden><div class="panel-head"><h2>连接跟单钱包</h2><span id="wallet-badge" class="badge neutral">尚未连接</span></div><p class="helper">使用独立 OKX Agentic Wallet。首次连接后，在官方页面允许自动交易并设置单笔、每日限额。填好策略即可点“启动实盘跟单”，程序会自动检查连接。</p><div id="wallet-info" class="helper"></div><div class="button-row"><button class="button primary" data-action="wallet-login">连接独立钱包</button><a class="button quiet" href="https://web3.okx.com/zh-hans/portfolio/agentic-wallet-policy?tab=limit" target="_blank" rel="noreferrer">设置交易限额 ↗</a></div><div id="wallet-login-state" class="helper"></div><p class="helper">SOL 实盘使用 USDC，BSC 使用 USDT，需相应原生币支付网络费。BSC 授权不足会跳过交易。当前实盘尚未完成本人账户的真实成交验收。</p></article>
+        <article class="panel"><div class="panel-head"><h2>查看独立账本</h2></div><label class="field"><span>记录视图</span><select id="view-select"><option value="paper">纸上交易</option><option value="live">实盘交易</option><option value="demo">离线演练（运行后可查看）</option></select></label><p class="helper">查看账本不会切换交易模式；已有纸上和实盘持仓均继续按原规则检查退出。</p></article>
+        <details id="connection-diagnostics" class="panel connection-panel"><summary class="panel-head diagnostics-summary"><strong>高级诊断 <span class="subtle">按需展开</span></strong><span id="okx-badge" class="badge neutral">启动时自动检查</span></summary><p class="helper">正常启动无需手动报价。程序会自动测试报价连接，实盘同时检查钱包登录和限额；每笔订单仍会核对余额、路由和成本。下方工具仅用于排查问题。</p><p class="helper">纸上模式无需钱包，可使用本机 .env 中的开发者报价凭证；已登录钱包的报价能力按实际账户权限验证。API 配置修改后需重启，费用及额度以官方账户为准。</p><div class="button-row"><button class="button" data-action="wallet-refresh">刷新钱包状态</button><button class="button quiet" data-action="wallet-poll">重新获取登录结果</button></div><form id="probe-form"><div class="probe-fields"><label class="field"><span>公链</span><select name="chain"><option value="SOL">Solana</option><option value="BSC">BNB Smart Chain</option></select></label><label class="field"><span>目标合约地址</span><input name="address" autocomplete="off" placeholder="粘贴完整 mint / 合约地址" required></label><button class="button" type="submit">手动测试报价</button></div></form><p id="probe-status" class="helper" role="status">启动时自动执行只读报价，不会提交交易。</p></details>
+      </section>
+      <footer class="footer"><span>TG COPY DESK · LOCAL WORKSPACE</span><span>自动采集 / 共用策略 / 纸上与实盘分账</span></footer>
+    </div>
+  </main>
+</div>
+<dialog id="message-dialog"><div class="dialog-head"><h2>消息原文</h2><button class="button small" id="close-dialog">关闭</button></div><pre id="message-body"></pre></dialog>
+<div id="toast" class="toast" role="status" hidden></div>
+</body></html>
