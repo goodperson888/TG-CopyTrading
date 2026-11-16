@@ -2,6 +2,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { CHANNEL, CHAINS, DEFAULTS, validateSettings, missingSettings, canonical, units, human, conservativeAmount } from './domain.mjs';
 import { validHash } from './receipts.mjs';
 import { parsePreview, classify } from './telegram.mjs';
+import { describeNetworkError } from './network.mjs';
 
 export class Engine {
   constructor(store, quotes, net, fixtures = [], live = null, initialSettings = {}) {
@@ -99,7 +100,7 @@ export class Engine {
       this.needsBaseline = false; this.lastSuccess = new Date().toISOString(); this.lastError = null; this.backoff = 0;
     } catch (error) {
       this.entriesEnabled = false; this.needsBaseline = true;
-      this.lastError = error.name === 'TimeoutError' ? '频道请求超时，请检查代理或网络' : error.message.slice(0, 180);
+      this.lastError = describeNetworkError(error, this.net.proxyEnabled);
       this.backoff = Math.min((this.backoff || this.config.pollSeconds) * 2, 300);
       this.store.log('warn', `监听失败：${this.lastError}；稍后重试。`);
     }
@@ -455,7 +456,7 @@ export class Engine {
       summary: { messages: scope ? this.store.count('signals', scope) : 0, open: open.length,
         blocked: open.filter(p => p.status === 'exit_blocked' || p.status === 'quote_unavailable').length,
         ...totals, budgetLeft: this.config.totalBudget === null ? null : Math.max(0, this.config.totalBudget - totals.invested - (scope === 'live' ? this.store.liveReserved() : 0)) },
-      serverTime: new Date().toISOString(), version: '0.3.0',
+      serverTime: new Date().toISOString(), version: '0.3.1',
     };
   }
 }

@@ -15,9 +15,13 @@ export class AgentWallet {
     this.binary = env.ONCHAINOS_BIN || join(root, '.tools', process.platform === 'win32' ? 'onchainos.exe' : 'onchainos');
     this.home = join(dataDir, 'agent-wallet'); mkdirSync(this.home, { recursive: true, mode: 0o700 });
     this.env = { ...env, ONCHAINOS_HOME: this.home, ONCHAINOS_CREDENTIAL_STORE: 'file' };
-    if (proxy) this.env.HTTPS_PROXY = this.env.HTTP_PROXY = proxy;
+    this.setProxy(proxy);
     this.runOverride = run; this.children = new Set(); this.login = null;
     this.info = { installed: Boolean(run || existsSync(this.binary)), loggedIn: false, addresses: {}, policy: null, status: '尚未检查钱包', checkedAt: null };
+  }
+  setProxy(proxy) {
+    for (const key of ['HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy', 'ALL_PROXY', 'all_proxy']) delete this.env[key];
+    if (proxy) this.env.HTTPS_PROXY = this.env.HTTP_PROXY = proxy;
   }
   async run(args, timeout = 45000) {
     if (this.runOverride) return this.runOverride(args);

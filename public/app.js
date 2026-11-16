@@ -23,7 +23,7 @@ const fields = {
 };
 for (const [id, specs] of Object.entries(fields)) $( '#' + id).innerHTML = specs.map(([name, label, min, max, step, placeholder]) => `<label class="field"><span>${label}</span><input name="${name}" type="number" min="${min}" max="${max}" step="${step}" placeholder="${placeholder}" inputmode="decimal" autocomplete="off"></label>`).join('');
 
-let state, token, initialized = false, pending = 0, toastTimer;
+let state, token, initialized = false, pending = 0, toastTimer, networkDirty = false;
 function toast(message, error = false) {
   const el = $('#toast'); el.textContent = message; el.classList.toggle('error', error); el.hidden = false;
   clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, error ? 10000 : 5000);
@@ -36,6 +36,13 @@ function page(name) {
 }
 function applyForm(config) {
   for (const [key, value] of Object.entries(config)) { const input = $('#settings-form').elements.namedItem(key); if (input) input.value = value ?? ''; }
+}
+function showProxyField() { $('#proxy-value-field').hidden = $('#proxy-mode').value !== 'custom'; }
+function applyNetworkForm() {
+  $('#proxy-mode').value = state.network.mode;
+  $('#proxy-value').value = state.network.value;
+  $('#proxy-value').placeholder = state.network.savedCustom ? '已保存代理；留空保留，也可填写新端口' : '例如 7897 或 http://127.0.0.1:7897';
+  networkDirty = false; showProxyField();
 }
 function badge(text, type = 'neutral') { return `<span class="badge ${type}">${escape(text)}</span>`; }
 function empty(title, detail, settingsLink = false) { return `<div class="empty"><div class="empty-symbol" aria-hidden="true">⌁</div><strong>${escape(title)}</strong><p>${escape(detail)}</p>${settingsLink ? '<button class="button small" data-go="settings">设置策略参数 →</button>' : ''}</div>`; }
@@ -74,6 +81,7 @@ function render() {
   $('#channel-proxy').textContent = state.connections.proxyEnabled ? '使用本机现有代理' : '直接连接';
   $('#channel-last').textContent = date(state.lastSuccess); $('#channel-id').textContent = state.highest || '—';
   $('#channel-error').hidden = !state.lastError; $('#channel-error').textContent = state.lastError || '';
+  $('#network-shortcut').hidden = !state.lastError;
   $('#start-monitor').disabled = state.monitoring; $('#start-monitor').innerHTML = state.monitoring ? '频道监听已开启' : '开启频道监听 <span>↗</span>';
   $('#stop-monitor').disabled = !state.monitoring;
   $('#rule-amount').textContent = c.orderAmount === null ? '待设置' : `${number(c.orderAmount)} U`;
@@ -92,6 +100,9 @@ function render() {
   $('#pending-orders').innerHTML = state.pendingOrders.length ? `<div class="notice error"><strong>实盘有 ${state.pendingOrders.length} 笔订单需要核对，禁止重复下单</strong></div>` + state.pendingOrders.map(o => `<div class="pending-order"><strong>${escape(o.name)} · ${escape(o.chain)} · ${o.side === 'buy' ? '买入' : '卖出'}</strong><p>${escape(o.issue || '等待链上最终确认')}</p><p>${escape(o.txHash || '尚无哈希，请查看官方钱包交易记录')}</p>${!o.txHash ? `<label class="field"><span>原订单已确认的交易哈希</span><input id="hash-${escape(o.id)}" autocomplete="off" placeholder="关联原订单，不会提交新交易"></label><button class="button small" data-bind-order="${escape(o.id)}">核对并关联哈希</button>` : ''}</div>`).join('') : '';
   $('#okx-badge').textContent = state.connections.okxConfigured ? '报价连接 · ' + state.connections.okxStatus : '报价权限待连接';
   $('#okx-badge').className = 'badge ' + (state.connections.okxConfigured ? 'blue' : 'neutral');
+  $('#network-badge').textContent = state.network.proxyEnabled ? '使用代理' : '当前直连';
+  $('#network-badge').className = 'badge ' + (state.network.proxyEnabled ? 'blue' : 'neutral');
+  $('#network-effective').textContent = state.network.proxyEnabled ? `当前后台代理：${state.network.effectiveProxy}。Telegram、OKX 报价和后续钱包请求共用此设置。` : '当前后台未使用代理。如果无法连接 Telegram，请开启 Clash 的系统代理，或选择手动代理并填写 HTTP／混合端口。';
   const credentials = state.credentials;
   $('#credentials-badge').textContent = credentials.configured ? '已保存 · 可测试连接' : '待填写个人凭证';
   $('#credentials-badge').className = 'badge ' + (credentials.configured ? 'blue' : 'neutral');
@@ -133,7 +144,7 @@ async function refresh() {
     if (!response.ok) throw new Error('无法读取本机状态');
     state = await response.json(); token = state.csrf;
     $('#connection-lost').hidden = true;
-    if (!initialized) { applyForm(state.config); initialized = true; }
+    if (!initialized) { applyForm(state.config); applyNetworkForm(); initialized = true; }
     render();
   } catch { $('#connection-lost').hidden = false; }
 }
@@ -175,6 +186,28 @@ document.addEventListener('click', async event => {
 });
 $('#signal-filter').addEventListener('change', render);
 $('#close-dialog').addEventListener('click', () => $('#message-dialog').close());
+$('#proxy-mode').addEventListener('change', showProxyField);
+$('#network-form').addEventListener('input', () => { networkDirty = true; $('#network-status').textContent = '网络设置有未保存的修改'; });
+$('#network-form').addEventListener('change', () => { networkDirty = true; });
+$('#network-form').addEventListener('submit', async event => {
+  event.preventDefault(); const form = event.currentTarget, buttons = form.querySelectorAll('button');
+  buttons.forEach(button => { button.disabled = true; }); pending++;
+  try {
+    await post('/api/network', Object.fromEntries(new FormData(form)));
+    await refresh(); applyNetworkForm();
+    $('#network-status').textContent = '网络设置已保存并立即生效。新买入暂停，监听会重新建立基线；可点击测试 Telegram 连接。';
+    toast('网络设置已保存，无需重启');
+  } catch (error) { $('#network-status').textContent = error.message; toast(error.message, true); }
+  finally { pending--; buttons.forEach(button => { button.disabled = false; }); }
+});
+$('#test-network').addEventListener('click', async event => {
+  if (networkDirty) { $('#network-status').textContent = '请先保存网络设置，再测试当前连接。'; return; }
+  const button = event.currentTarget; button.disabled = true; pending++;
+  $('#network-status').textContent = '正在通过后台请求 Telegram 公开消息，请稍候…';
+  try { const result = await post('/api/network/test'); $('#network-status').textContent = result.message; }
+  catch (error) { $('#network-status').textContent = error.message; toast(error.message, true); }
+  finally { pending--; button.disabled = false; await refresh(); }
+});
 $('#credentials-form').addEventListener('submit', async event => {
   event.preventDefault();
   const form = event.currentTarget, buttons = form.querySelectorAll('button');

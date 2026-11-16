@@ -18,17 +18,31 @@ function dotenv(values) {
   return text;
 }
 
+export function readLocalEnv(path) {
+  try {
+    if (!existsSync(path)) return {};
+    if (!lstatSync(path).isFile()) throw new Error();
+    return parseEnv(readFileSync(path, 'utf8'));
+  } catch { throw new Error('无法读取本机 .env，请检查文件和访问权限'); }
+}
+
+export function writeLocalEnv(path, values) {
+  const content = dotenv(values);
+  const temporary = path + '.' + randomBytes(10).toString('hex') + '.tmp';
+  try {
+    writeFileSync(temporary, content, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+    renameSync(temporary, path);
+  } catch { throw new Error('保存失败，请检查程序目录是否可写；未应用新配置'); }
+  finally { try { unlinkSync(temporary); } catch { /* 已完成原子替换或未创建临时文件 */ } }
+}
+
 export class LocalCredentials {
   constructor(root, env = process.env) {
     this.path = join(root, '.env');
     this.values = pick({ ...env, ...this.read() });
   }
   read() {
-    try {
-      if (!existsSync(this.path)) return {};
-      if (!lstatSync(this.path).isFile()) throw new Error();
-      return parseEnv(readFileSync(this.path, 'utf8'));
-    } catch { throw new Error('无法读取本机 .env，请检查文件和访问权限'); }
+    return readLocalEnv(this.path);
   }
   status() {
     const fields = Object.fromEntries(CREDENTIAL_FIELDS.map(key => [key, Boolean(this.values[key])]));
@@ -43,13 +57,7 @@ export class LocalCredentials {
     }
     if (!Object.keys(changes).length) throw new Error('请至少填写一项；留空会保留已保存的值');
     const next = { ...this.values, ...changes };
-    const content = dotenv({ ...this.read(), ...next });
-    const temporary = this.path + '.' + randomBytes(10).toString('hex') + '.tmp';
-    try {
-      writeFileSync(temporary, content, { encoding: 'utf8', mode: 0o600, flag: 'wx' });
-      renameSync(temporary, this.path);
-    } catch { throw new Error('保存失败，请检查程序目录是否可写；未应用新凭证'); }
-    finally { try { unlinkSync(temporary); } catch { /* 已完成原子替换或未创建临时文件 */ } }
+    writeLocalEnv(this.path, { ...this.read(), ...next });
     this.values = next;
     return this.status();
   }

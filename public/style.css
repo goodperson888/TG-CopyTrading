@@ -12,3 +12,5 @@
 .diagnostics-summary{cursor:pointer;gap:14px;min-height:52px;flex-wrap:wrap}.diagnostics-summary strong{font-size:13px;font-weight:600}.diagnostics-summary .subtle{margin-left:8px}.diagnostics-summary::marker{color:var(--muted)}.diagnostics-summary .badge{white-space:normal;overflow-wrap:anywhere}.connection-panel>.button-row{padding:0 24px;flex-wrap:wrap}details.connection-panel[open]>summary{margin-bottom:18px}@media(max-width:700px){.connection-panel>.button-row{padding:0 17px}.diagnostics-summary .badge{max-width:100%}}
 
 #api-config-panel{margin-bottom:20px}#credentials-form>.helper{margin:14px 22px}#credentials-form>.button-row{margin:18px 22px;flex-wrap:wrap}@media(max-width:640px){#credentials-form>.helper{margin:14px 17px}#credentials-form>.button-row{margin:18px 17px}}
+
+#network-config-panel{margin-bottom:20px}#network-form>.helper{margin:14px 22px}#network-form>.button-row{margin:18px 22px;flex-wrap:wrap}@media(max-width:640px){#network-form>.helper{margin:14px 17px}#network-form>.button-row{margin:18px 17px}}

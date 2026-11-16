@@ -16,6 +16,11 @@ export class QuoteRouter {
   get verified() { return this.provider.verified; }
   get lastStatus() { return this.provider.lastStatus; }
   quote(...args) { return this.provider.quote(...args); }
+  invalidate() {
+    for (const source of new Set([this.api, this.provider])) {
+      source.verified = false; source.lastStatus = '网络已更换，等待重新验证';
+    }
+  }
   async testCredentials() {
     if (!this.api.configured) throw new Error('请先保存 API Key、Secret 和 Passphrase');
     this.api.verified = false;
