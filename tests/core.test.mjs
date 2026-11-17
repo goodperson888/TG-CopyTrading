@@ -245,6 +245,47 @@ test('OKX 服务拒绝时只返回错误代码，不把服务端正文或密钥�
   assert.equal(q.lastStatus.includes('secret-value'), false);
 });
 
+test('信号区分买入报价与卖出试算失败，不产生持仓或重复补买', async t => {
+  for (const direction of ['buy', 'sell']) {
+    const e = setup(t); arm(e); fakeMarket(e);
+    const market = e.quotes.quote;
+    e.quotes.quote = async (...args) => {
+      if ((args[1] === CHAINS[args[0]].spend) === (direction === 'buy')) throw new Error('报价暂不可用（82112）');
+      return market(...args);
+    };
+    const message = fresh(first[1]);
+    const signal = await e.ingest(message);
+    assert.equal(signal.state, 'skipped');
+    assert.match(signal.reason, direction === 'buy' ? /买入报价失败/ : /卖出试算失败/);
+    assert.equal(e.store.count('positions', 'paper'), 0);
+    await e.ingest(message);
+    assert.equal(e.store.count('orders', 'paper'), 0);
+  }
+});
+
+test('自动重试恢复后仅建仓一次并记录重试次数；过期信号仍跳过', async t => {
+  const e = setup(t); arm(e); fakeMarket(e);
+  const market = e.quotes.quote;
+  e.quotes.quote = async (...args) => ({ ...await market(...args), requestAttempts: 2 });
+  const message = fresh(first[1]);
+  const signal = await e.ingest(message);
+  assert.equal(signal.state, 'paper_bought');
+  assert.equal(signal.quoteRetries, 2);
+  assert.match(signal.reason, /自动重试 2 次后恢复/);
+  await e.ingest(message);
+  assert.equal(e.store.count('positions', 'paper'), 1);
+  assert.equal(e.store.count('orders', 'paper'), 1);
+
+  const expired = fresh(first[2], 9002);
+  e.quotes.quote = async (...args) => {
+    const quote = await market(...args);
+    expired.publishedAt = new Date(Date.now() - 3600000).toISOString();
+    return { ...quote, requestAttempts: 2 };
+  };
+  assert.match((await e.ingest(expired)).reason, /信号已过期/);
+  assert.equal(e.store.count('positions', 'paper'), 1);
+});
+
 test('纸上启动自动验证两个网络报价，无需手动输入地址或连接钱包，不产生订单', async t => {
   const e = setup(t), requests = [];
   e.needsBaseline = false; e.lastSuccess = new Date().toISOString();

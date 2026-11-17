@@ -140,12 +140,16 @@ export class Engine {
         let quote;
         if (demo) quote = this.demoBuyQuote(asset, inputRaw);
         else {
-          quote = await this.quotes.quote(asset.chain, chain.spend, asset.address, inputRaw, this.config.maxPriceImpactPct);
-          const reverse = await this.quotes.quote(asset.chain, asset.address, chain.spend,
-            conservativeAmount(quote.toRaw, this.config.maxSlippagePct), this.config.maxPriceImpactPct);
+          try { quote = await this.quotes.quote(asset.chain, chain.spend, asset.address, inputRaw, this.config.maxPriceImpactPct); }
+          catch (error) { throw new Error(`买入报价失败：${error.message}`); }
+          let reverse;
+          try { reverse = await this.quotes.quote(asset.chain, asset.address, chain.spend,
+            conservativeAmount(quote.toRaw, this.config.maxSlippagePct), this.config.maxPriceImpactPct); }
+          catch (error) { throw new Error(`卖出试算失败：${error.message}`); }
           this.checkQuote(reverse, this.config);
           if (reverse.toDecimals !== chain.decimals || reverse.fromDecimals !== quote.toDecimals) throw new Error('买卖方向报价精度不一致');
           quote.entryMark = reverse.toAmount / human(conservativeAmount(quote.toRaw, this.config.maxSlippagePct), quote.toDecimals);
+          signal.quoteRetries = Math.max(0, (quote.requestAttempts || 1) - 1) + Math.max(0, (reverse.requestAttempts || 1) - 1);
           if (!this.entriesEnabled) throw new Error('新买入已暂停');
           this.assertFresh(message);
         }
@@ -154,6 +158,7 @@ export class Engine {
         } else {
           this.openPosition(signal, quote, scope, demo);
           signal.state = 'paper_bought'; signal.reason = demo ? '离线样本演练，使用合成报价' : '按真实报价模拟成交，没有链上交易';
+          if (signal.quoteRetries) signal.reason += `；报价自动重试 ${signal.quoteRetries} 次后恢复`;
         }
       } catch (error) { signal.state = 'skipped'; signal.reason = error.message.slice(0, 220); }
     }
