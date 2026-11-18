@@ -40,6 +40,9 @@ test('本机 HTTP 控制台：来源校验、令牌校验、静态文件隔离�
   const saved = await (await fetch(base + '/api/state')).json(); assert.equal(saved.config.orderAmount, 10);
   const exported = await (await fetch(base + '/api/export')).text();
   assert.ok(!exported.includes(initial.csrf)); assert.ok(!exported.includes('OKX_API_SECRET'));
+  const runtime = JSON.parse(exported).runtime;
+  assert.equal(runtime.entriesEnabled, false); assert.equal(runtime.entryRecovery, null);
+  assert.equal(runtime.version, saved.version); assert.equal(typeof runtime.monitoring, 'boolean');
   const html = await fetch(base + '/'); assert.equal(html.status, 200); assert.ok(html.headers.get('content-security-policy').includes("script-src 'self'"));
 });
 

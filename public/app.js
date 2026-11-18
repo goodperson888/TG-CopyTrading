@@ -88,9 +88,9 @@ function render() {
   $('#rule-positions').textContent = c.maxPositions === null ? '待设置' : `${c.maxPositions} 个`;
   $('#rule-profit').textContent = c.takeProfitPct === null ? '待设置' : `+${number(c.takeProfitPct)}%`;
   $('#rule-loss').textContent = c.stopLossPct === null ? '待设置' : `−${number(c.stopLossPct)}%`;
-  $('#strategy-note').textContent = state.missing.length ? `还有 ${state.missing.length} 项交易参数待填写；监听与归档可先开启。` : state.entriesEnabled ? '新信号按当前模式成交，已有持仓继续按建仓规则检查退出。' : '参数已填写，点击启动后自动检查连接。';
-  $('#enable-entries').hidden = state.entriesEnabled; $('#pause-entries').hidden = !state.entriesEnabled && !state.startingEntries;
-  $('#pause-entries').textContent = state.startingEntries ? '取消启动' : '暂停新买入';
+  $('#strategy-note').textContent = state.missing.length ? `还有 ${state.missing.length} 项交易参数待填写；监听与归档可先开启。` : state.entryRecovery ? '网络中断，新买入暂缓；连接恢复并通过检查后自动继续。已有持仓继续检查退出。' : state.entriesEnabled ? '新信号按当前模式成交，已有持仓继续按建仓规则检查退出。' : '参数已填写，点击启动后自动检查连接。';
+  $('#enable-entries').hidden = state.entriesEnabled || Boolean(state.entryRecovery); $('#pause-entries').hidden = !state.entriesEnabled && !state.startingEntries && !state.entryRecovery;
+  $('#pause-entries').textContent = state.startingEntries ? '取消启动' : state.entryRecovery ? '取消自动恢复' : '暂停新买入';
   $('#recent-signals').innerHTML = signalsTable(state.signals.slice(0, 5));
   const filter = $('#signal-filter').value;
   $('#all-signals').innerHTML = signalsTable(state.signals.filter(s => filter === 'all' || s.kind === filter));
@@ -113,13 +113,15 @@ function render() {
 }
 function renderMode() {
   const c = state.config, live = c.mode === 'live', w = state.connections.wallet;
+  const status = state.entriesEnabled ? '跟单运行中' : state.entryRecovery ? '等待网络恢复' : '新买入暂停';
   $('#mode-select').value = c.mode; $('#view-select').value = state.view;
-  $('#active-mode').textContent = `${live ? '实盘交易' : '纸上交易'} · ${state.entriesEnabled ? '跟单运行中' : '新买入暂停'}`;
+  $('#active-mode').textContent = `${live ? '实盘交易' : '纸上交易'} · ${status}`;
   $('#mode-title').textContent = state.view === 'live' ? '正在查看实盘账本' : '正在查看纸上账本';
   $('#mode-description').textContent = `${live ? '当前启动后将使用真实资金自动签名交易。' : '当前启动后只进行纸上交易，无需连接钱包。'} 两个账本独立，当前查看${state.view === 'live' ? '实盘' : '纸上'}记录。`;
   $('.mode-controls').classList.toggle('mode-live', live);
-  $('#trade-status').textContent = state.entriesEnabled ? '跟单运行中' : '新买入暂停';
-  $('#readiness-note').textContent = state.startingEntries ? '正在自动检查报价和钱包权限，只读检查不会下单…' : state.readiness || '策略已就绪，启动时自动检查连接';
+  $('#trade-status').textContent = status;
+  $('#app-version').textContent = `v${state.version}`;
+  $('#readiness-note').textContent = state.startingEntries ? '正在自动检查报价和钱包权限，只读检查不会下单…' : state.entryRecovery ? '正在自动重连；恢复并通过检查后继续跟单，也可取消自动恢复。' : state.readiness || '策略已就绪，启动时自动检查连接';
   $('#enable-entries').textContent = state.startingEntries ? '正在检查连接…' : live ? '启动实盘跟单' : '启动纸上跟单';
   $('#enable-entries').disabled = Boolean(state.startingEntries);
   $('#wallet-panel').hidden = !live;

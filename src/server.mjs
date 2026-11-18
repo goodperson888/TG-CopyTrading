@@ -62,6 +62,8 @@ export function createApp({ dataDir = process.env.TG_COPY_DATA_DIR || join(ROOT,
         response.writeHead(200, { ...headers, 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': 'attachment; filename="tg-copy-records.json"' });
         const state = engine.state();
         return response.end(JSON.stringify({ exportedAt: new Date().toISOString(), view: state.view,
+          runtime: { version: state.version, monitoring: state.monitoring, entriesEnabled: state.entriesEnabled, entryRecovery: state.entryRecovery,
+            baselineReady: state.baselineReady, lastSuccess: state.lastSuccess, lastError: state.lastError },
           config: state.config, signals: state.signals, positions: state.positions, orders: state.orders, logs: state.logs }, null, 2));
       }
       if (request.method === 'GET') {
@@ -154,7 +156,7 @@ export function createApp({ dataDir = process.env.TG_COPY_DATA_DIR || join(ROOT,
   const work = async () => {
     if (closing) return;
     try { await engine.exclusive(() => engine.tick()); }
-    catch { engine.entriesEnabled = false; store.log('error', '后台任务异常，已暂停新买入，请查看订单和持仓状态。', engine.config.mode); }
+    catch { engine.pauseEntries(); store.log('error', '后台任务异常，已暂停新买入并取消自动恢复，请查看订单和持仓状态。', engine.config.mode); }
     if (!closing) { timer = setTimeout(work, 1000); timer.unref(); }
   };
   if (runWorker) { timer = setTimeout(work, 1000); timer.unref(); }

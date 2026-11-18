@@ -3,6 +3,7 @@ import { CHANNEL, CHAINS, DEFAULTS, validateSettings, missingSettings, canonical
 import { validHash } from './receipts.mjs';
 import { parsePreview, classify } from './telegram.mjs';
 import { describeNetworkError } from './network.mjs';
+import packageInfo from '../package.json' with { type: 'json' };
 
 export class Engine {
   constructor(store, quotes, net, fixtures = [], live = null, initialSettings = {}) {
@@ -15,6 +16,7 @@ export class Engine {
     this.view = this.config.mode; this.demoScope = store.get('meta', 'demoScope')?.value || null;
     this.monitoring = true; this.entriesEnabled = false; this.needsBaseline = true;
     this.startGeneration = 0; this.startingEntries = false;
+    this.entryRecovery = null;
     this.lastPoll = 0; this.lastPrices = 0; this.lastSuccess = null; this.lastError = null;
     this.highest = store.get('meta', 'highest')?.value || 0; this.mutex = Promise.resolve(); this.backoff = 0; this.lastOrders = 0;
     this.store.log('info', '程序已启动，自动建立频道监听基线；新买入保持暂停，请检查模式和策略后启动跟单。');
@@ -36,7 +38,11 @@ export class Engine {
     this.store.log('info', '正在建立频道基线：当前窗口只归档，后续新首推才参与模拟。');
     await this.poll();
   }
-  pauseEntries() { this.entriesEnabled = false; this.startGeneration++; }
+  pauseEntries() {
+    this.entriesEnabled = false;
+    if (this.entryRecovery) this.store.log('warn', '已取消断网后的自动恢复，新买入保持暂停。', this.config.mode);
+    this.entryRecovery = null; this.startGeneration++;
+  }
   assertEntryPrerequisites(requireVerified = true) {
     if (!this.monitoring || this.needsBaseline || this.lastError || !this.lastSuccess || Date.now() - Date.parse(this.lastSuccess) > this.config.maxSignalAgeSec * 1000) throw new Error('请先建立健康的频道监听基线');
     this.assertReady();
@@ -49,6 +55,7 @@ export class Engine {
     }
   }
   async startEntries() {
+    this.entryRecovery = null;
     const generation = ++this.startGeneration;
     const checkCancelled = () => {
       if (generation !== this.startGeneration) throw new Error('启动已取消，新买入保持暂停');
@@ -79,15 +86,17 @@ export class Engine {
   }
   async poll() {
     this.lastPoll = Date.now();
+    let received = false;
     try {
       const html = await this.net.get(`https://t.me/s/${CHANNEL}`, { 'user-agent': 'TGCopyDesk/0.1 public-preview-reader', 'cache-control': 'no-cache' });
+      received = true;
       const messages = parsePreview(html);
       const firstId = messages[0].id;
       const gap = this.highest > 0 && firstId > this.highest + 1;
       const baseline = this.needsBaseline || gap;
       if (gap) {
-        this.entriesEnabled = false;
-        this.store.log('error', `发现消息窗口缺口（上次 ${this.highest}，当前从 ${firstId} 开始），已暂停新模拟买入；缺失记录未补齐。`);
+        this.pauseEntries();
+        this.store.log('error', `发现消息窗口缺口（上次 ${this.highest}，当前从 ${firstId} 开始），已暂停新买入并取消自动恢复；缺失记录未补齐，请核对后手动启动。`, this.config.mode);
       }
       for (const message of messages) {
         const archived = baseline || message.id <= this.highest;
@@ -98,11 +107,31 @@ export class Engine {
       this.highest = Math.max(this.highest, ...messages.map(m => m.id));
       this.store.put('meta', 'highest', { value: this.highest });
       this.needsBaseline = false; this.lastSuccess = new Date().toISOString(); this.lastError = null; this.backoff = 0;
+      if (this.entryRecovery) {
+        const recovery = this.entryRecovery;
+        if (recovery.generation !== this.startGeneration || recovery.mode !== this.config.mode || !this.monitoring) this.pauseEntries();
+        else {
+          try {
+            // Only restore an already-running session after a transport failure.
+            // The recovered window was archived above; no missed signal is replayed.
+            this.assertEntryPrerequisites();
+            this.entryRecovery = null;
+            this.enableEntries();
+            this.store.log('info', '频道连接已恢复并重建基线，已自动恢复跟单；恢复窗口只归档，后续新首推才参与买入。', this.config.mode);
+          } catch {
+            this.pauseEntries();
+            this.store.log('warn', '频道连接已恢复，但跟单连接、钱包或订单检查未通过；新买入保持暂停，请检查后手动启动。', this.config.mode);
+          }
+        }
+      }
     } catch (error) {
+      if (!received && this.entriesEnabled && this.monitoring) {
+        this.entryRecovery = { generation: this.startGeneration, mode: this.config.mode, since: new Date().toISOString() };
+      } else if (received) this.pauseEntries();
       this.entriesEnabled = false; this.needsBaseline = true;
       this.lastError = describeNetworkError(error, this.net.proxyEnabled);
       this.backoff = Math.min((this.backoff || this.config.pollSeconds) * 2, 300);
-      this.store.log('warn', `监听失败：${this.lastError}；稍后重试。`);
+      this.store.log('warn', `监听失败：${this.lastError}；稍后重试。${this.entryRecovery ? '新买入暂缓，连接恢复并通过检查后自动继续。' : '新买入保持暂停。'}`, this.config.mode);
     }
   }
   async ingest(message, { baseline = false, scope = 'paper', demo = false } = {}) {
@@ -251,7 +280,7 @@ export class Engine {
       this.store.log('warn', `${order.name} 实盘${order.side === 'buy' ? '买单' : '卖单'}已提交，等待链上最终确认；尚未计为成交。`, 'live');
     } catch {
       order.status = 'unknown'; order.issue = '签名或广播结果不明；请在官方钱包核对原订单并关联哈希，禁止重发';
-      this.entriesEnabled = false; this.store.log('error', order.issue, 'live');
+      this.pauseEntries(); this.store.log('error', order.issue, 'live');
     }
     this.store.put('orders', order.id, order, 'live');
   }
@@ -283,7 +312,7 @@ export class Engine {
     for (const order of this.store.pendingOrders()) {
       if (!order.txHash) {
         if (order.status === 'submitting') { order.status = 'unknown'; order.issue = '程序中断时订单未获得哈希，请核对官方钱包原订单，禁止重发'; this.store.put('orders', order.id, order, 'live'); }
-        this.entriesEnabled = false; continue;
+        this.pauseEntries(); continue;
       }
       try {
         const fill = await this.live.get(order);
@@ -323,12 +352,12 @@ export class Engine {
           });
         }
         if (BigInt(fill.outputRaw) < BigInt(order.minOutputRaw) || fill.feeNative * order.nativePriceUsd > order.policy.maxNetworkFeeUsd + 1e-9 || this.store.totals('live').invested > order.policy.totalBudget + 1e-9) {
-          this.entriesEnabled = false;
+          this.pauseEntries();
           this.store.log('error', '实际成交数量或费用偏离预检边界，成交已如实入账并暂停新买入；请核对官方交易回执。', 'live');
         }
         this.store.log('info', `${order.name} 实盘${order.side === 'buy' ? '买入' : '全卖'}已最终确认，均价取实际资产变化。`, 'live');
       } catch (error) {
-        this.entriesEnabled = false;
+        this.pauseEntries();
         const issue = error.message.slice(0, 200);
         if (order.issue !== issue) this.store.log('error', `${order.name} 原订单核对受阻：${issue}；保留原订单，不重发。`, 'live');
         order.issue = issue; this.store.put('orders', order.id, order, 'live');
@@ -450,7 +479,7 @@ export class Engine {
     } catch (error) { readiness = error.message; }
     return { config: this.config, missing: missingSettings(this.config), view: this.view,
       readiness,
-      monitoring: this.monitoring, entriesEnabled: this.entriesEnabled, startingEntries: this.startingEntries, lastSuccess: this.lastSuccess,
+      monitoring: this.monitoring, entriesEnabled: this.entriesEnabled, entryRecovery: this.entryRecovery ? { since: this.entryRecovery.since, mode: this.entryRecovery.mode } : null, startingEntries: this.startingEntries, lastSuccess: this.lastSuccess,
       lastError: this.lastError, highest: this.highest, baselineReady: !this.needsBaseline,
       connections: { telegram: this.lastError ? 'error' : this.lastSuccess ? 'connected' : 'idle', proxyEnabled: this.net.proxyEnabled,
         okxConfigured: this.quotes.configured, okxStatus: this.quotes.lastStatus, liveAvailable: Boolean(this.live?.wallet.info.loggedIn), wallet: this.live?.wallet.info || null, login: this.live?.wallet.loginPublic?.() || null },
@@ -461,7 +490,7 @@ export class Engine {
       summary: { messages: scope ? this.store.count('signals', scope) : 0, open: open.length,
         blocked: open.filter(p => p.status === 'exit_blocked' || p.status === 'quote_unavailable').length,
         ...totals, budgetLeft: this.config.totalBudget === null ? null : Math.max(0, this.config.totalBudget - totals.invested - (scope === 'live' ? this.store.liveReserved() : 0)) },
-      serverTime: new Date().toISOString(), version: '0.3.1',
+      serverTime: new Date().toISOString(), version: packageInfo.version,
     };
   }
 }
