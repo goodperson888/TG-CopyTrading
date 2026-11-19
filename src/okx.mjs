@@ -3,11 +3,17 @@ import { CHAINS, canonical, finite, human } from './domain.mjs';
 
 const RETRYABLE_QUOTE_CODES = new Set(['82112', '50011']);
 const MAX_QUOTE_ATTEMPTS = 3;
-function quoteFailure(code, attempts) {
+function quoteFailure(code, attempts, remoteMessage = '') {
   const reason = code === '82112' ? 'OKX 报价校验暂未通过'
     : code === '50011' ? 'OKX 报价请求限流'
     : 'OKX 接口返回错误';
-  return new Error(`${reason}（${code}）${attempts > 1 ? `，已尝试 ${attempts} 次` : ''}；未取得可用报价，未执行交易`);
+  // Keep only the documented, non-sensitive part of OKX's 82112 message.
+  // Remote error bodies are untrusted and must never be copied into logs wholesale.
+  const threshold = code === '82112'
+    ? String(remoteMessage).match(/^The value difference from this transaction`s quote route is higher than (\d+(?:\.\d+)?)%, which may lead to a risk of loss to user assets\.$/)?.[1]
+    : null;
+  const detail = threshold ? `；当前报价保护阈值为 ${threshold}%，低于该交易路由差异` : '';
+  return new Error(`${reason}（${code}）${attempts > 1 ? `，已尝试 ${attempts} 次` : ''}${detail}；未取得可用报价，未执行交易`);
 }
 
 export function signedHeaders(credentials, path, timestamp = new Date().toISOString()) {
@@ -47,7 +53,7 @@ export class OkxQuotes {
             this.lastStatus = `报价暂不可用（${code}），正在重试 ${attempt}/${MAX_QUOTE_ATTEMPTS - 1}`;
             continue;
           }
-          const error = quoteFailure(code, attempt);
+          const error = quoteFailure(code, attempt, json?.msg);
           this.lastStatus = error.message;
           throw error;
         }

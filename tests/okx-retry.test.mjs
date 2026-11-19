@@ -40,6 +40,13 @@ test('82112 连续失败最多尝试三次，队列继续可用，不泄露响�
   assert.equal(calls, 4);
 });
 
+test('82112 记录安全的保护阈值提示，但不写入远端原文', async () => {
+  const message = 'The value difference from this transaction`s quote route is higher than 1%, which may lead to a risk of loss to user assets.';
+  const q = new OkxQuotes({ get: async () => JSON.stringify({ code: '82112', msg: message }) }, env);
+  await assert.rejects(q.quote(...args), error => error.message.includes('当前报价保护阈值为 1%') && !error.message.includes('transaction`s quote route'));
+  assert.match(q.lastStatus, /当前报价保护阈值为 1%/);
+});
+
 test('权限和无路由错误不重试；返回报价中的蜜罐检查仍生效', async () => {
   for (const code of ['50111', '82000', '82104']) {
     let calls = 0;

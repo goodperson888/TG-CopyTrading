@@ -14,7 +14,7 @@ const fields = {
   ],
   'limit-fields': [
     ['maxSlippagePct', '最大滑点 · %', 0, 30, '.01', '纸上保守扣减，实盘固定容忍值'], ['maxChasePct', '最大追价幅度 · %', 0, 1000, '.01', '相对频道首推参考价'],
-    ['maxPriceImpactPct', '最大价格影响 · %', 0, 30, '.01', '超过则跳过'], ['maxNetworkFeeUsd', '单笔预估网络费上限 · USD', 0, 1000, '.01', '超过则跳过'],
+    ['maxPriceImpactPct', '最大价格影响 · %', 0, 30, '.01', '过低可能触发 OKX 82112；超过则跳过'], ['maxNetworkFeeUsd', '单笔预估网络费上限 · USD', 0, 1000, '.01', '超过则跳过'],
   ],
   'timing-fields': [
     ['maxSignalAgeSec', '信号有效期 · 秒', 10, 3600, '1', ''], ['pollSeconds', '频道轮询间隔 · 秒', 10, 300, '1', ''], ['quoteSeconds', '持仓报价间隔 · 秒', 10, 600, '1', ''],
